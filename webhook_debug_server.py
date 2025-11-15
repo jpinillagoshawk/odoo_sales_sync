@@ -449,7 +449,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         return '\n'.join([indent + line for line in json_str.split('\n')])
 
     def log_to_file(self, level, message, data=None):
-        """Log to file if file logger is configured"""
+        """Log to file if file logger is configured (unbuffered)"""
         if self.file_logger:
             log_entry = {
                 'timestamp': datetime.now().isoformat(),
@@ -457,7 +457,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 'message': message,
                 'data': data
             }
-            self.file_logger.info(json.dumps(log_entry))
+            self.file_logger.info(json.dumps(log_entry, indent=2))
+            # Force flush for immediate write
+            for handler in self.file_logger.handlers:
+                handler.flush()
 
     def log_message(self, format, *args):
         """Override to suppress default request logging"""
@@ -466,7 +469,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             super().log_message(format, *args)
 
 def setup_file_logging(log_file_path):
-    """Setup rotating file logger"""
+    """Setup rotating file logger with unbuffered output"""
     logger = logging.getLogger('webhook_logger')
     logger.setLevel(logging.INFO)
 
@@ -482,6 +485,13 @@ def setup_file_logging(log_file_path):
         backupCount=5
     )
     handler.setLevel(logging.INFO)
+
+    # Set formatter for better readability
+    formatter = logging.Formatter('%(message)s')
+    handler.setFormatter(formatter)
+
+    # Force flush after each write (unbuffered)
+    handler.stream.reconfigure(line_buffering=True) if hasattr(handler.stream, 'reconfigure') else None
 
     logger.addHandler(handler)
     return logger

@@ -129,21 +129,28 @@ class odoo_sales_sync extends Module
             && $this->registerHook('actionObjectAddressUpdateAfter')
             && $this->registerHook('actionObjectAddressDeleteAfter')
 
-            // Order hooks (4)
+            // Order hooks (9)
             && $this->registerHook('actionValidateOrder')
+            && $this->registerHook('actionValidateOrderAfter')
             && $this->registerHook('actionOrderStatusUpdate')
+            && $this->registerHook('actionOrderStatusPostUpdate')
             && $this->registerHook('actionObjectOrderUpdateAfter')
             && $this->registerHook('actionOrderEdited')
+            && $this->registerHook('actionProductCancel')
+            && $this->registerHook('actionAdminOrdersTrackingNumberUpdate')
+            && $this->registerHook('actionOrderHistoryAddAfter')
 
-            // Invoice hooks (4)
+            // Invoice hooks (5)
             && $this->registerHook('actionObjectOrderInvoiceAddAfter')
             && $this->registerHook('actionObjectOrderInvoiceUpdateAfter')
-            && $this->registerHook('actionPDFInvoiceRender') // CRITICAL - was missing in original plan
+            && $this->registerHook('actionPDFInvoiceRender')
             && $this->registerHook('actionOrderSlipAdd')
+            && $this->registerHook('actionSetInvoice')
 
-            // Payment hooks (2) - NEW
+            // Payment hooks (3)
             && $this->registerHook('actionPaymentCCAdd')
             && $this->registerHook('actionObjectOrderPaymentAddAfter')
+            && $this->registerHook('actionPaymentConfirmation')
 
             // Coupon/Discount hooks (7)
             && $this->registerHook('actionObjectCartRuleAddAfter')
@@ -869,8 +876,98 @@ class odoo_sales_sync extends Module
         }
     }
 
+    public function hookActionValidateOrderAfter($params)
+    {
+        try {
+            if (!$this->logger) {
+                $this->initializeComponents();
+            }
+            if (!Configuration::get('ODOO_SALES_SYNC_ENABLED')) {
+                return true;
+            }
+            return $this->detector->detectOrderChange('actionValidateOrderAfter', $params, 'created');
+        } catch (Exception $e) {
+            if ($this->logger) {
+                $this->logger->error('Hook failed', array('hook' => 'hookActionValidateOrderAfter', 'error' => $e->getMessage()));
+            }
+            return false;
+        }
+    }
+
+    public function hookActionOrderStatusPostUpdate($params)
+    {
+        try {
+            if (!$this->logger) {
+                $this->initializeComponents();
+            }
+            if (!Configuration::get('ODOO_SALES_SYNC_ENABLED')) {
+                return true;
+            }
+            return $this->detector->detectOrderChange('actionOrderStatusPostUpdate', $params, 'status_changed');
+        } catch (Exception $e) {
+            if ($this->logger) {
+                $this->logger->error('Hook failed', array('hook' => 'hookActionOrderStatusPostUpdate', 'error' => $e->getMessage()));
+            }
+            return false;
+        }
+    }
+
+    public function hookActionProductCancel($params)
+    {
+        try {
+            if (!$this->logger) {
+                $this->initializeComponents();
+            }
+            if (!Configuration::get('ODOO_SALES_SYNC_ENABLED')) {
+                return true;
+            }
+            return $this->detector->detectProductCancellation('actionProductCancel', $params);
+        } catch (Exception $e) {
+            if ($this->logger) {
+                $this->logger->error('Hook failed', array('hook' => 'hookActionProductCancel', 'error' => $e->getMessage()));
+            }
+            return false;
+        }
+    }
+
+    public function hookActionAdminOrdersTrackingNumberUpdate($params)
+    {
+        try {
+            if (!$this->logger) {
+                $this->initializeComponents();
+            }
+            if (!Configuration::get('ODOO_SALES_SYNC_ENABLED')) {
+                return true;
+            }
+            return $this->detector->detectOrderChange('actionAdminOrdersTrackingNumberUpdate', $params, 'tracking_updated');
+        } catch (Exception $e) {
+            if ($this->logger) {
+                $this->logger->error('Hook failed', array('hook' => 'hookActionAdminOrdersTrackingNumberUpdate', 'error' => $e->getMessage()));
+            }
+            return false;
+        }
+    }
+
+    public function hookActionOrderHistoryAddAfter($params)
+    {
+        try {
+            if (!$this->logger) {
+                $this->initializeComponents();
+            }
+            if (!Configuration::get('ODOO_SALES_SYNC_ENABLED')) {
+                return true;
+            }
+            return $this->detector->detectOrderHistoryChange('actionOrderHistoryAddAfter', $params);
+        } catch (Exception $e) {
+            if ($this->logger) {
+                $this->logger->error('Hook failed', array('hook' => 'hookActionOrderHistoryAddAfter', 'error' => $e->getMessage()));
+            }
+            return false;
+        }
+    }
+
     // ========================================================================
-    // INVOICE HOOKS (4)
+    // INVOICE HOOKS (5)
     // ========================================================================
 
     public function hookActionObjectOrderInvoiceAddAfter($params)
@@ -945,8 +1042,26 @@ class odoo_sales_sync extends Module
         }
     }
 
+    public function hookActionSetInvoice($params)
+    {
+        try {
+            if (!$this->logger) {
+                $this->initializeComponents();
+            }
+            if (!Configuration::get('ODOO_SALES_SYNC_ENABLED')) {
+                return true;
+            }
+            return $this->detector->detectInvoiceNumberAssignment('actionSetInvoice', $params);
+        } catch (Exception $e) {
+            if ($this->logger) {
+                $this->logger->error('Hook failed', array('hook' => 'hookActionSetInvoice', 'error' => $e->getMessage()));
+            }
+            return false;
+        }
+    }
+
     // ========================================================================
-    // PAYMENT HOOKS (2) - NEW
+    // PAYMENT HOOKS (3)
     // ========================================================================
 
     public function hookActionPaymentCCAdd($params)
@@ -980,6 +1095,24 @@ class odoo_sales_sync extends Module
         } catch (Exception $e) {
             if ($this->logger) {
                 $this->logger->error('Hook failed', array('hook' => 'hookActionObjectOrderPaymentAddAfter', 'error' => $e->getMessage()));
+            }
+            return false;
+        }
+    }
+
+    public function hookActionPaymentConfirmation($params)
+    {
+        try {
+            if (!$this->logger) {
+                $this->initializeComponents();
+            }
+            if (!Configuration::get('ODOO_SALES_SYNC_ENABLED')) {
+                return true;
+            }
+            return $this->detector->detectPaymentConfirmation('actionPaymentConfirmation', $params);
+        } catch (Exception $e) {
+            if ($this->logger) {
+                $this->logger->error('Hook failed', array('hook' => 'hookActionPaymentConfirmation', 'error' => $e->getMessage()));
             }
             return false;
         }

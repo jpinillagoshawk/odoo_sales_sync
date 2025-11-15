@@ -1338,6 +1338,210 @@ class OdooSalesEventDetector
     }
 
     /**
+     * Detect product cancellation events (refunds, returns, cancellations)
+     *
+     * @param string $hookName Hook name
+     * @param array $params Hook parameters
+     * @return bool Success
+     */
+    public function detectProductCancellation($hookName, $params)
+    {
+        try {
+            // Extract order and cancellation details
+            $order = isset($params['order']) ? $params['order'] : null;
+            $idOrderDetail = isset($params['id_order_detail']) ? (int)$params['id_order_detail'] : null;
+            $cancelQuantity = isset($params['cancel_quantity']) ? (int)$params['cancel_quantity'] : 0;
+            $cancelAmount = isset($params['cancel_amount']) ? (float)$params['cancel_amount'] : 0.0;
+            $action = isset($params['action']) ? $params['action'] : 'cancel';
+
+            if (!$order || !$idOrderDetail) {
+                return false;
+            }
+
+            // Determine action type based on action parameter
+            $actionType = 'product_canceled';
+            if (isset($params['action'])) {
+                switch ($params['action']) {
+                    case 'partial_refund':
+                    case 'standard_refund':
+                        $actionType = 'product_refunded';
+                        break;
+                    case 'return_product':
+                        $actionType = 'product_returned';
+                        break;
+                }
+            }
+
+            // Build order data with cancellation context
+            $afterData = $this->extractOrderData($order);
+
+            $contextData = [
+                'id_order_detail' => $idOrderDetail,
+                'cancel_quantity' => $cancelQuantity,
+                'cancel_amount' => $cancelAmount,
+                'action' => $action
+            ];
+
+            // Queue the event
+            $this->queue->queueEvent(
+                'order',
+                (int)$order->id,
+                isset($order->reference) ? $order->reference : '',
+                $actionType,
+                null,
+                $afterData,
+                'Order product cancellation: ' . $actionType,
+                $hookName,
+                $contextData
+            );
+
+            return true;
+        } catch (Exception $e) {
+            $this->logger->error('Failed to detect product cancellation', [
+                'hook' => $hookName,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Detect order history addition events
+     *
+     * @param string $hookName Hook name
+     * @param array $params Hook parameters
+     * @return bool Success
+     */
+    public function detectOrderHistoryChange($hookName, $params)
+    {
+        try {
+            $orderHistory = isset($params['order_history']) ? $params['order_history'] : null;
+
+            if (!$orderHistory || !isset($orderHistory->id_order)) {
+                return false;
+            }
+
+            // Load the order
+            $order = new Order((int)$orderHistory->id_order);
+            if (!Validate::isLoadedObject($order)) {
+                return false;
+            }
+
+            // This is redundant with actionOrderStatusUpdate, so we'll skip it
+            // to avoid duplicate events. Just return true to not break the hook.
+            return true;
+        } catch (Exception $e) {
+            $this->logger->error('Failed to detect order history change', [
+                'hook' => $hookName,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Detect invoice number assignment
+     *
+     * @param string $hookName Hook name
+     * @param array $params Hook parameters
+     * @return bool Success
+     */
+    public function detectInvoiceNumberAssignment($hookName, $params)
+    {
+        try {
+            $order = isset($params['Order']) ? $params['Order'] : null;
+            $orderInvoice = isset($params['OrderInvoice']) ? $params['OrderInvoice'] : null;
+
+            if (!$order || !$orderInvoice) {
+                return false;
+            }
+
+            // Extract invoice data
+            $invoiceData = [
+                'id' => isset($orderInvoice->id) ? (int)$orderInvoice->id : null,
+                'number' => isset($orderInvoice->number) ? (int)$orderInvoice->number : null,
+                'id_order' => isset($order->id) ? (int)$order->id : null,
+                'order_reference' => isset($order->reference) ? $order->reference : '',
+                'use_existing_payment' => isset($params['use_existing_payment']) ? (bool)$params['use_existing_payment'] : false
+            ];
+
+            // Queue the event as an invoice update
+            $this->queue->queueEvent(
+                'invoice',
+                (int)$orderInvoice->id,
+                isset($orderInvoice->number) ? 'INV-' . $orderInvoice->number : '',
+                'invoice_number_assigned',
+                null,
+                $invoiceData,
+                'Invoice number assigned',
+                $hookName,
+                null
+            );
+
+            return true;
+        } catch (Exception $e) {
+            $this->logger->error('Failed to detect invoice number assignment', [
+                'hook' => $hookName,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Detect payment confirmation
+     *
+     * @param string $hookName Hook name
+     * @param array $params Hook parameters
+     * @return bool Success
+     */
+    public function detectPaymentConfirmation($hookName, $params)
+    {
+        try {
+            $idOrder = isset($params['id_order']) ? (int)$params['id_order'] : null;
+
+            if (!$idOrder) {
+                return false;
+            }
+
+            // Load the order
+            $order = new Order($idOrder);
+            if (!Validate::isLoadedObject($order)) {
+                return false;
+            }
+
+            // Extract order data with payment confirmed context
+            $afterData = $this->extractOrderData($order);
+
+            $contextData = [
+                'payment_confirmed' => true,
+                'payment_status' => 'accepted'
+            ];
+
+            // Queue the event
+            $this->queue->queueEvent(
+                'order',
+                (int)$order->id,
+                isset($order->reference) ? $order->reference : '',
+                'payment_confirmed',
+                null,
+                $afterData,
+                'Payment confirmed for order: ' . $order->reference,
+                $hookName,
+                $contextData
+            );
+
+            return true;
+        } catch (Exception $e) {
+            $this->logger->error('Failed to detect payment confirmation', [
+                'hook' => $hookName,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
      * Generate transaction hash for deduplication
      *
      * @param string $entityType Entity type
