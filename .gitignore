@@ -1,0 +1,34 @@
+# Module specific
+*.log
+*.log.*
+webhooks.log*
+debug.log*
+
+# Development
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.env
+
+# Backups
+*.backup
+*.bak
+*.old
+README_MODULE.md
+
+# Temporary files
+*.tmp
+*.temp
+
+# Do not commit sensitive data
+config_override.php
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/

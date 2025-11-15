@@ -1,0 +1,255 @@
+/**
+ * Odoo Sales Sync - Admin CSS
+ *
+ * @author Odoo Sales Sync Module
+ * @version 1.0.0
+ */
+
+/* Module panel */
+.odoo-sales-sync-panel {
+    margin-top: 20px;
+}
+
+.odoo-sales-sync-panel .panel {
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.odoo-sales-sync-panel .panel-heading {
+    background: #f8f9fa;
+    font-weight: 600;
+    font-size: 16px;
+    padding: 12px 15px;
+}
+
+.odoo-sales-sync-panel .tab-content {
+    padding: 20px;
+    background: #fff;
+}
+
+/* Navigation tabs */
+.odoo-sales-sync-panel .nav-tabs {
+    margin-bottom: 0;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.odoo-sales-sync-panel .nav-tabs > li > a {
+    padding: 10px 20px;
+    font-weight: 500;
+    color: #495057;
+}
+
+.odoo-sales-sync-panel .nav-tabs > li.active > a,
+.odoo-sales-sync-panel .nav-tabs > li.active > a:hover,
+.odoo-sales-sync-panel .nav-tabs > li.active > a:focus {
+    color: #25b9d7;
+    border-bottom: 3px solid #25b9d7;
+    background: transparent;
+}
+
+/* Tables */
+.odoo-sales-sync-panel .table {
+    margin-top: 15px;
+    font-size: 13px;
+}
+
+.odoo-sales-sync-panel .table thead th {
+    background: #f8f9fa;
+    font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
+    padding: 10px;
+}
+
+.odoo-sales-sync-panel .table tbody td {
+    padding: 8px 10px;
+    vertical-align: middle;
+}
+
+.odoo-sales-sync-panel .table-striped tbody tr:nth-of-type(odd) {
+    background-color: #f9f9f9;
+}
+
+/* Labels and badges */
+.odoo-sales-sync-panel .label {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+.odoo-sales-sync-panel .badge {
+    font-size: 11px;
+    padding: 3px 7px;
+    border-radius: 3px;
+}
+
+.badge-success {
+    background-color: #28a745;
+}
+
+.badge-danger {
+    background-color: #dc3545;
+}
+
+.badge-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.badge-info {
+    background-color: #17a2b8;
+}
+
+/* Log level colors */
+.log-error {
+    background-color: #ffebee !important;
+}
+
+.log-warning {
+    background-color: #fff3e0 !important;
+}
+
+.log-info {
+    background-color: #e3f2fd !important;
+}
+
+.log-debug {
+    background-color: #f5f5f5 !important;
+}
+
+/* Alerts */
+.odoo-sales-sync-panel .alert {
+    margin-top: 15px;
+    padding: 12px 15px;
+    border-radius: 4px;
+}
+
+.odoo-sales-sync-panel .alert-success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.odoo-sales-sync-panel .alert-danger {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.odoo-sales-sync-panel .alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+}
+
+/* Buttons */
+.odoo-sales-sync-panel .btn {
+    margin-left: 5px;
+    padding: 8px 15px;
+    font-weight: 500;
+    border-radius: 4px;
+}
+
+.odoo-sales-sync-panel .btn-primary {
+    background-color: #25b9d7;
+    border-color: #25b9d7;
+}
+
+.odoo-sales-sync-panel .btn-primary:hover {
+    background-color: #1da4be;
+    border-color: #1da4be;
+}
+
+.odoo-sales-sync-panel .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Test connection result */
+#test-connection-result {
+    margin-top: 15px;
+    min-height: 20px;
+}
+
+#test-connection-result .alert {
+    margin-top: 0;
+}
+
+/* Pagination */
+.odoo-sales-sync-panel .pagination {
+    margin: 15px 0;
+}
+
+.odoo-sales-sync-panel .pagination li a {
+    padding: 6px 12px;
+    color: #25b9d7;
+}
+
+.odoo-sales-sync-panel .pagination li.active a {
+    background-color: #25b9d7;
+    border-color: #25b9d7;
+    color: #fff;
+}
+
+/* Modal */
+.odoo-sales-sync-panel pre {
+    background: #f5f5f5;
+    padding: 15px;
+    border-radius: 4px;
+    font-size: 12px;
+    border: 1px solid #dee2e6;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.modal-lg {
+    width: 900px;
+}
+
+/* Responsive table */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Loading states */
+.icon-spin {
+    animation: icon-spin 1s infinite linear;
+}
+
+@keyframes icon-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Form elements */
+.odoo-sales-sync-panel .form-control {
+    border-radius: 4px;
+}
+
+.odoo-sales-sync-panel .form-control:focus {
+    border-color: #25b9d7;
+    box-shadow: 0 0 0 0.2rem rgba(37, 185, 215, 0.25);
+}
+
+/* Panel footer */
+.panel-footer {
+    background: #f8f9fa;
+    padding: 10px 15px;
+}
+
+.panel-footer .text-muted {
+    font-size: 12px;
+    color: #6c757d;
+}
+
+/* Icon spacing */
+.odoo-sales-sync-panel i {
+    margin-right: 5px;
+}
+
+/* Badge in tabs */
+.nav-tabs .badge {
+    margin-left: 5px;
+    font-size: 10px;
+}
