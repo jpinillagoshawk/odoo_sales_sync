@@ -272,12 +272,22 @@ class OdooSalesWebhookClient
             'User-Agent: PrestaShop-Odoo-Sales-Sync/2.0'
         ];
 
+        // Log full payload for debugging (can be disabled in production)
+        $debugEnabled = Configuration::get('ODOO_SALES_SYNC_DEBUG', false);
+        if ($debugEnabled) {
+            $this->logger->debug('[WEBHOOK_CLIENT] Full JSON payload', [
+                'payload' => $jsonPayload
+            ]);
+        }
+
         $this->logger->debug('[WEBHOOK_CLIENT] Sending HTTP request', [
             'url' => $this->webhookUrl,
             'method' => 'POST',
             'payload_size' => strlen($jsonPayload),
+            'payload_bytes' => mb_strlen($jsonPayload, '8bit'),
             'event_count' => count($batchData['events']),
-            'payload_preview' => substr($jsonPayload, 0, 200) . '...'
+            'payload_preview' => substr($jsonPayload, 0, 200) . '...',
+            'headers' => implode(' | ', $headers)
         ]);
 
         $ch = curl_init();
@@ -291,23 +301,47 @@ class OdooSalesWebhookClient
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // TODO: Set to true in production
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);     // TODO: Set to 2 in production
 
+        // Explicitly set encoding options for cURL
+        curl_setopt($ch, CURLOPT_ENCODING, ''); // Accept any encoding
+        curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+
         $startTime = microtime(true);
         $response = curl_exec($ch);
         $executionTime = microtime(true) - $startTime;
 
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlInfo = curl_getinfo($ch);
         $curlError = curl_error($ch);
         $curlErrno = curl_errno($ch);
         curl_close($ch);
+
+        // Log detailed cURL info for debugging
+        $this->logger->debug('[WEBHOOK_CLIENT] cURL request completed', [
+            'http_code' => $httpCode,
+            'size_upload' => $curlInfo['size_upload'],
+            'size_download' => $curlInfo['size_download'],
+            'content_type' => $curlInfo['content_type'] ?? null,
+            'header_size' => $curlInfo['header_size'] ?? null
+        ]);
 
         if ($curlError) {
             $this->logger->error('[WEBHOOK_CLIENT] cURL error', [
                 'error' => $curlError,
                 'errno' => $curlErrno,
-                'url' => $this->webhookUrl
+                'url' => $this->webhookUrl,
+                'curl_info' => $curlInfo
             ]);
 
             throw new Exception('cURL error: ' . $curlError);
+        }
+
+        // Validate response is not empty
+        if ($response === false) {
+            $this->logger->error('[WEBHOOK_CLIENT] cURL returned false', [
+                'http_code' => $httpCode,
+                'curl_info' => $curlInfo
+            ]);
+            throw new Exception('cURL exec returned false');
         }
 
         $decodedResponse = json_decode($response, true);
@@ -315,7 +349,9 @@ class OdooSalesWebhookClient
         $this->logger->debug('[WEBHOOK_CLIENT] HTTP response received', [
             'http_code' => $httpCode,
             'response_size' => strlen($response),
-            'execution_time_seconds' => round($executionTime, 3)
+            'response_json_valid' => (json_last_error() === JSON_ERROR_NONE),
+            'execution_time_seconds' => round($executionTime, 3),
+            'response_preview' => substr($response, 0, 500)
         ]);
 
         if ($httpCode >= 400) {
