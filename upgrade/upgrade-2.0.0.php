@@ -1,17 +1,14 @@
 <?php
 /**
- * Upgrade script for Odoo Sales Sync v2.0.0
+ * Upgrade from version 1.x to 2.0.0
  *
- * This script handles the upgrade from v1.x to v2.0.0
- * 
+ * This file will be executed when upgrading from any 1.x version to 2.0.0
+ *
  * Major changes:
  * - Added reverse synchronization support
  * - New table: ps_odoo_sales_reverse_operations
  * - New configuration keys for reverse sync
  * - New classes for reverse sync processing
- *
- * @author Odoo Sales Sync Module
- * @version 2.0.0
  */
 
 if (!defined('_PS_VERSION_')) {
@@ -19,13 +16,16 @@ if (!defined('_PS_VERSION_')) {
 }
 
 /**
- * Upgrade to version 2.0.0
+ * Upgrade function for module version 2.0.0
  *
- * @param object $module Module instance
- * @return bool Success
+ * @param Module $module
+ * @return bool
  */
 function upgrade_module_2_0_0($module)
 {
+    $success = true;
+    $db = Db::getInstance();
+
     // Step 1: Create new database table for reverse operations
     $sql = "CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "odoo_sales_reverse_operations` (
         `id_reverse_operation` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -48,19 +48,46 @@ function upgrade_module_2_0_0($module)
         KEY `entity_type_status` (`entity_type`, `status`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Tracks reverse synchronization operations from Odoo';";
 
-    if (!Db::getInstance()->execute($sql)) {
-        return false;
+    try {
+        if (!$db->execute($sql)) {
+            $success = false;
+            error_log('Upgrade error: Could not create ps_odoo_sales_reverse_operations table');
+        }
+    } catch (Exception $e) {
+        $success = false;
+        error_log('Upgrade exception: ' . $e->getMessage());
     }
 
     // Step 2: Add new configuration keys for reverse sync (disabled by default)
-    Configuration::updateValue('ODOO_SALES_SYNC_REVERSE_ENABLED', 0);
-    Configuration::updateValue('ODOO_SALES_SYNC_DEBUG_WEBHOOK_URL', '');
-    Configuration::updateValue('ODOO_SALES_SYNC_REVERSE_ALLOWED_IPS', '');
+    if ($success) {
+        Configuration::updateValue('ODOO_SALES_SYNC_REVERSE_ENABLED', 0);
+        Configuration::updateValue('ODOO_SALES_SYNC_DEBUG_WEBHOOK_URL', '');
+        Configuration::updateValue('ODOO_SALES_SYNC_REVERSE_ALLOWED_IPS', '');
+    }
 
-    // Step 3: Log upgrade success
-    $logger = new FileLogger();
-    $logger->setFilename(_PS_MODULE_DIR_ . 'odoo_sales_sync/var/logs/odoo_sales_sync_upgrade.log');
-    $logger->logInfo('Successfully upgraded to v2.0.0 - Reverse sync enabled');
+    // Step 3: Clear cache
+    try {
+        Tools::clearSmartyCache();
+        Tools::clearXMLCache();
+    } catch (Exception $e) {
+        // Continue even if cache clear fails
+        error_log('Upgrade warning: Could not clear cache - ' . $e->getMessage());
+    }
 
-    return true;
+    // Step 4: Log upgrade result
+    try {
+        if (class_exists('FileLogger')) {
+            $logger = new FileLogger();
+            $logger->setFilename(_PS_MODULE_DIR_ . 'odoo_sales_sync/var/logs/odoo_sales_sync_upgrade.log');
+            if ($success) {
+                $logger->logInfo('Successfully upgraded to v2.0.0 - Reverse sync added');
+            } else {
+                $logger->logError('Failed to upgrade to v2.0.0');
+            }
+        }
+    } catch (Exception $e) {
+        // Continue even if logging fails
+    }
+
+    return $success;
 }
