@@ -336,3 +336,26 @@ function exportEvents() {
 function toggleAllEvents(source) {
     $('.event-checkbox').prop('checked', source.checked);
 }
+
+/**
+ * Clear event filters
+ */
+function clearEventFilters() {
+    $('#events_filter_minutes').val('60');
+    $('#events_filter_entity').val('');
+    $('#events_filter_action').val('');
+    $('#events_filter_status').val('');
+    $('#events-filter-form').submit();
+}
+
+// ============================================================================
+// Logs Tab Functions
+// ============================================================================
+
+/**
+ * Change logs per page limit and reload
+ */
+function changeLogsLimit() {
+    $('#logs_page').val(1); // Reset to page 1
+    $('#logs-filter-form').submit();
+}

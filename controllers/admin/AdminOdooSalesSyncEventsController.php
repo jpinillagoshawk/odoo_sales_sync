@@ -237,6 +237,9 @@ class AdminOdooSalesSyncEventsController extends ModuleAdminController
             $event['before_data_decoded'] = json_decode($event['before_data'], true);
             $event['after_data_decoded'] = json_decode($event['after_data'], true);
             $event['context_data_decoded'] = json_decode($event['context_data'], true);
+
+            // Check if this is a reverse sync event (from Odoo inbound webhook)
+            $event['is_reverse_sync'] = isset($event['hook_name']) && $event['hook_name'] === 'reverse_webhook';
         }
 
         return $events;
@@ -595,6 +598,16 @@ class AdminOdooSalesSyncEventsController extends ModuleAdminController
     {
         $html = '<div class="event-detail-modal">';
         $html .= '<h4>Event #' . (int)$event['id_event'] . ' - ' . ucfirst($event['entity_type']) . ' ' . ucfirst($event['action_type']) . '</h4>';
+
+        // Check if this is a reverse sync event (inbound from Odoo)
+        $isReverseSync = isset($event['is_reverse_sync']) && $event['is_reverse_sync'];
+
+        if ($isReverseSync) {
+            $html .= '<div class="alert alert-info" style="margin: 10px 0;">';
+            $html .= '<i class="icon-download"></i> <strong>Odoo Inbound Event</strong> - This event was received FROM Odoo (reverse webhook)';
+            $html .= '</div>';
+        }
+
         $html .= '<hr>';
 
         // Common event information
@@ -603,7 +616,14 @@ class AdminOdooSalesSyncEventsController extends ModuleAdminController
         $html .= '<dl class="dl-horizontal">';
         $html .= '<dt>Entity:</dt><dd>' . htmlspecialchars($event['entity_name']) . ' (#' . (int)$event['entity_id'] . ')</dd>';
         $html .= '<dt>Action:</dt><dd>' . htmlspecialchars($event['action_type']) . '</dd>';
-        $html .= '<dt>Hook:</dt><dd>' . htmlspecialchars($event['hook_name']) . '</dd>';
+
+        if ($isReverseSync) {
+            $html .= '<dt>Direction:</dt><dd><span class="label label-info"><i class="icon-download"></i> Odoo → PrestaShop</span></dd>';
+        } else {
+            $html .= '<dt>Hook:</dt><dd>' . htmlspecialchars($event['hook_name']) . '</dd>';
+            $html .= '<dt>Direction:</dt><dd><span class="label label-primary"><i class="icon-upload"></i> PrestaShop → Odoo</span></dd>';
+        }
+
         $html .= '<dt>Date:</dt><dd>' . htmlspecialchars($event['date_add']) . '</dd>';
         $html .= '</dl>';
         $html .= '</div>';

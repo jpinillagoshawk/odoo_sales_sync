@@ -75,6 +75,9 @@ class OdooSalesReverseWebhookRouter
             // Add processing time to result
             $result['processing_time_ms'] = OdooSalesReverseSyncContext::getProcessingTimeMs();
 
+            // Create event tracking entry for UI visibility
+            self::createEventRecord($operationId, $entityType, $entityId, $actionType, $payload, $result);
+
             self::$logger->info('[REVERSE_WEBHOOK_ROUTER] Processing completed', [
                 'operation_id' => $operationId,
                 'success' => $result['success'],
@@ -252,5 +255,104 @@ class OdooSalesReverseWebhookRouter
         }
 
         return $health;
+    }
+
+    /**
+     * Create event record in ps_odoo_sales_events for UI visibility
+     * This allows reverse sync events to show in the Events tab
+     *
+     * @param string $operationId Operation ID
+     * @param string $entityType Entity type
+     * @param int|null $entityId Entity ID
+     * @param string $actionType Action type
+     * @param array $payload Source payload
+     * @param array $result Processing result
+     * @return void
+     */
+    private static function createEventRecord($operationId, $entityType, $entityId, $actionType, $payload, $result)
+    {
+        try {
+            require_once dirname(__FILE__) . '/OdooSalesEvent.php';
+
+            $event = new OdooSalesEvent();
+            $event->entity_type = $entityType;
+            $event->entity_id = (int)($entityId ?? 0);
+            $event->entity_name = self::getEntityName($entityType, $entityId, $payload);
+            $event->action_type = $actionType;
+            $event->transaction_hash = hash('sha256', $operationId . time());
+            $event->correlation_id = $operationId;
+            $event->hook_name = 'reverse_webhook'; // CRITICAL: marks as reverse sync
+            $event->hook_timestamp = date('Y-m-d H:i:s');
+            $event->before_data = null;
+            $event->after_data = null;
+            $event->change_summary = 'Received from Odoo (reverse sync): ' . $actionType;
+            $event->context_data = json_encode($payload);
+            $event->sync_status = $result['success'] ? 'success' : 'failed';
+            $event->sync_attempts = 1;
+            $event->sync_last_attempt = date('Y-m-d H:i:s');
+            $event->sync_error = $result['success'] ? null : ($result['error'] ?? 'Unknown error');
+            $event->date_add = date('Y-m-d H:i:s');
+            $event->date_upd = date('Y-m-d H:i:s');
+
+            $event->add();
+
+            self::$logger->debug('[REVERSE_WEBHOOK_ROUTER] Event record created', [
+                'operation_id' => $operationId,
+                'event_id' => $event->id
+            ]);
+
+        } catch (Exception $e) {
+            // Don't fail the whole operation if event creation fails
+            self::$logger->warning('[REVERSE_WEBHOOK_ROUTER] Failed to create event record', [
+                'operation_id' => $operationId,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Get entity name for display
+     *
+     * @param string $entityType Entity type
+     * @param int|null $entityId Entity ID
+     * @param array $payload Payload data
+     * @return string Entity name
+     */
+    private static function getEntityName($entityType, $entityId, $payload)
+    {
+        $data = $payload['data'] ?? [];
+
+        switch ($entityType) {
+            case 'customer':
+            case 'contact':
+                if (isset($data['firstname']) && isset($data['lastname'])) {
+                    return $data['firstname'] . ' ' . $data['lastname'];
+                }
+                if (isset($data['email'])) {
+                    return $data['email'];
+                }
+                break;
+
+            case 'order':
+                if (isset($data['reference'])) {
+                    return 'Order ' . $data['reference'];
+                }
+                break;
+
+            case 'address':
+                if (isset($data['address1'])) {
+                    return $data['address1'];
+                }
+                break;
+
+            case 'coupon':
+            case 'cart_rule':
+                if (isset($data['code'])) {
+                    return 'Coupon ' . $data['code'];
+                }
+                break;
+        }
+
+        return ucfirst($entityType) . ' #' . ($entityId ?? 'unknown');
     }
 }
