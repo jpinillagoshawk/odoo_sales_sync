@@ -57,7 +57,7 @@ class odoo_sales_sync extends Module
     {
         $this->name = 'odoo_sales_sync';
         $this->tab = 'administration';
-        $this->version = '1.1.0';
+        $this->version = '2.0.0';
         $this->author = 'Azor Data SL';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array('min' => '8.0.0', 'max' => '8.99.99');
@@ -66,7 +66,7 @@ class odoo_sales_sync extends Module
         parent::__construct();
 
         $this->displayName = $this->l('Odoo Sales Sync');
-        $this->description = $this->l('Synchronizes customer, order, invoice, and coupon events with Odoo via webhook. Enhanced with complete order data for migration.');
+        $this->description = $this->l('Bi-directional synchronization with Odoo. Sends customer, order, invoice, and coupon events to Odoo. NEW v2.0: Receives updates FROM Odoo (reverse sync).');
         $this->author_email = 'info@azordata.com';
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall? All event data will be deleted.');
@@ -185,6 +185,11 @@ class odoo_sales_sync extends Module
         Configuration::deleteByName('ODOO_SALES_SYNC_WEBHOOK_SECRET');
         Configuration::deleteByName('ODOO_SALES_SYNC_DEBUG');
 
+        // v2.0.0 - Remove reverse sync configuration
+        Configuration::deleteByName('ODOO_SALES_SYNC_REVERSE_ENABLED');
+        Configuration::deleteByName('ODOO_SALES_SYNC_DEBUG_WEBHOOK_URL');
+        Configuration::deleteByName('ODOO_SALES_SYNC_REVERSE_ALLOWED_IPS');
+
         return parent::uninstall();
     }
 
@@ -285,6 +290,15 @@ class odoo_sales_sync extends Module
             Configuration::updateValue('ODOO_SALES_SYNC_WEBHOOK_SECRET', $webhookSecret);
             Configuration::updateValue('ODOO_SALES_SYNC_DEBUG', $debug);
 
+            // v2.0.0 - Reverse sync configuration
+            $reverseEnabled = Tools::getValue('ODOO_SALES_SYNC_REVERSE_ENABLED');
+            $debugWebhookUrl = Tools::getValue('ODOO_SALES_SYNC_DEBUG_WEBHOOK_URL');
+            $allowedIps = Tools::getValue('ODOO_SALES_SYNC_REVERSE_ALLOWED_IPS');
+
+            Configuration::updateValue('ODOO_SALES_SYNC_REVERSE_ENABLED', $reverseEnabled);
+            Configuration::updateValue('ODOO_SALES_SYNC_DEBUG_WEBHOOK_URL', $debugWebhookUrl);
+            Configuration::updateValue('ODOO_SALES_SYNC_REVERSE_ALLOWED_IPS', $allowedIps);
+
             $output .= $this->displayConfirmation($this->l('Settings updated'));
         }
 
@@ -335,6 +349,19 @@ class odoo_sales_sync extends Module
      */
     private function getConfigurationContent()
     {
+        // Build reverse webhook URL
+        $reverseWebhookUrl = $this->context->link->getModuleLink(
+            'odoo_sales_sync',
+            'reverse_webhook',
+            [],
+            true
+        );
+        // Manual fallback if module link doesn't work
+        if (empty($reverseWebhookUrl) || strpos($reverseWebhookUrl, 'reverse_webhook') === false) {
+            $shopUrl = Tools::getShopDomainSsl(true);
+            $reverseWebhookUrl = $shopUrl . __PS_BASE_URI__ . 'modules/odoo_sales_sync/reverse_webhook.php';
+        }
+
         $fieldsForm = array(
             'form' => array(
                 'legend' => array(
@@ -379,6 +406,45 @@ class odoo_sales_sync extends Module
                         ),
                         'desc' => $this->l('Enable debug logging (verbose)')
                     ),
+                    array(
+                        'type' => 'html',
+                        'name' => 'reverse_sync_section_header',
+                        'html_content' => '<hr><h3 style="margin-top:20px;">' . $this->l('🔄 Reverse Synchronization (v2.0.0)') . '</h3>'
+                    ),
+                    array(
+                        'type' => 'switch',
+                        'label' => $this->l('Enable Reverse Sync'),
+                        'name' => 'ODOO_SALES_SYNC_REVERSE_ENABLED',
+                        'is_bool' => true,
+                        'values' => array(
+                            array('id' => 'reverse_on', 'value' => 1, 'label' => $this->l('Yes')),
+                            array('id' => 'reverse_off', 'value' => 0, 'label' => $this->l('No'))
+                        ),
+                        'desc' => $this->l('Allow Odoo to send updates back to PrestaShop (customers, orders, addresses, coupons)')
+                    ),
+                    array(
+                        'type' => 'text',
+                        'label' => $this->l('Reverse Webhook URL'),
+                        'name' => 'ODOO_SALES_SYNC_REVERSE_WEBHOOK_URL_DISPLAY',
+                        'size' => 64,
+                        'disabled' => true,
+                        'readonly' => true,
+                        'desc' => $this->l('Configure this URL in Odoo to enable reverse sync. Copy and paste into Odoo webhook settings.')
+                    ),
+                    array(
+                        'type' => 'text',
+                        'label' => $this->l('Debug Webhook URL'),
+                        'name' => 'ODOO_SALES_SYNC_DEBUG_WEBHOOK_URL',
+                        'size' => 64,
+                        'desc' => $this->l('Optional: URL for webhook debug server (e.g., http://localhost:8000/webhook)')
+                    ),
+                    array(
+                        'type' => 'text',
+                        'label' => $this->l('Allowed IPs (Optional)'),
+                        'name' => 'ODOO_SALES_SYNC_REVERSE_ALLOWED_IPS',
+                        'size' => 64,
+                        'desc' => $this->l('Comma-separated list of allowed IP addresses for reverse webhooks (leave empty to allow all)')
+                    ),
                 ),
                 'submit' => array(
                     'title' => $this->l('Save'),
@@ -398,6 +464,12 @@ class odoo_sales_sync extends Module
         $helper->fields_value['ODOO_SALES_SYNC_WEBHOOK_URL'] = Configuration::get('ODOO_SALES_SYNC_WEBHOOK_URL');
         $helper->fields_value['ODOO_SALES_SYNC_WEBHOOK_SECRET'] = Configuration::get('ODOO_SALES_SYNC_WEBHOOK_SECRET');
         $helper->fields_value['ODOO_SALES_SYNC_DEBUG'] = Configuration::get('ODOO_SALES_SYNC_DEBUG');
+
+        // v2.0.0 - Reverse sync fields
+        $helper->fields_value['ODOO_SALES_SYNC_REVERSE_ENABLED'] = Configuration::get('ODOO_SALES_SYNC_REVERSE_ENABLED');
+        $helper->fields_value['ODOO_SALES_SYNC_REVERSE_WEBHOOK_URL_DISPLAY'] = $reverseWebhookUrl;
+        $helper->fields_value['ODOO_SALES_SYNC_DEBUG_WEBHOOK_URL'] = Configuration::get('ODOO_SALES_SYNC_DEBUG_WEBHOOK_URL');
+        $helper->fields_value['ODOO_SALES_SYNC_REVERSE_ALLOWED_IPS'] = Configuration::get('ODOO_SALES_SYNC_REVERSE_ALLOWED_IPS');
 
         $formHtml = $helper->generateForm(array($fieldsForm));
 

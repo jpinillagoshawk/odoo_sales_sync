@@ -49,6 +49,17 @@ class OdooSalesEventDetector
     public function detectCustomerChange($hookName, $params, $action)
     {
         try {
+            // CRITICAL: Check if this is a reverse sync operation (from Odoo)
+            // If yes, skip event creation to prevent infinite webhook loops
+            if (class_exists('OdooSalesReverseSyncContext') && OdooSalesReverseSyncContext::isReverseSync()) {
+                $this->logger->debug('[LOOP_PREVENTION] Skipping customer event - reverse sync operation', [
+                    'hook' => $hookName,
+                    'operation_id' => OdooSalesReverseSyncContext::getOperationId(),
+                    'entity_type' => 'customer'
+                ]);
+                return true; // Return true to not break the hook chain
+            }
+
             if (!isset($params['object'])) {
                 $this->logger->debug('Customer hook missing object parameter (expected for some hooks)', [
                     'hook' => $hookName,
@@ -176,6 +187,15 @@ class OdooSalesEventDetector
     public function detectAddressChange($hookName, $params, $action)
     {
         try {
+            // CRITICAL: Loop prevention for reverse sync operations
+            if (class_exists('OdooSalesReverseSyncContext') && OdooSalesReverseSyncContext::isReverseSync()) {
+                $this->logger->debug('[LOOP_PREVENTION] Skipping address event - reverse sync operation', [
+                    'hook' => $hookName,
+                    'operation_id' => OdooSalesReverseSyncContext::getOperationId()
+                ]);
+                return true;
+            }
+
             if (!isset($params['object'])) {
                 $this->logger->warning('Address hook missing object parameter', [
                     'hook' => $hookName
@@ -304,6 +324,15 @@ class OdooSalesEventDetector
     public function detectOrderChange($hookName, $params, $action)
     {
         try {
+            // CRITICAL: Loop prevention for reverse sync operations
+            if (class_exists('OdooSalesReverseSyncContext') && OdooSalesReverseSyncContext::isReverseSync()) {
+                $this->logger->debug('[LOOP_PREVENTION] Skipping order event - reverse sync operation', [
+                    'hook' => $hookName,
+                    'operation_id' => OdooSalesReverseSyncContext::getOperationId()
+                ]);
+                return true;
+            }
+
             $order = null;
 
             // Extract order from different hook parameters
@@ -688,6 +717,15 @@ class OdooSalesEventDetector
     public function detectCouponChange($hookName, $params, $action)
     {
         try {
+            // CRITICAL: Loop prevention for reverse sync operations
+            if (class_exists('OdooSalesReverseSyncContext') && OdooSalesReverseSyncContext::isReverseSync()) {
+                $this->logger->debug('[LOOP_PREVENTION] Skipping coupon event - reverse sync operation', [
+                    'hook' => $hookName,
+                    'operation_id' => OdooSalesReverseSyncContext::getOperationId()
+                ]);
+                return true;
+            }
+
             if (!isset($params['object'])) {
                 $this->logger->warning('Coupon hook missing object parameter', [
                     'hook' => $hookName

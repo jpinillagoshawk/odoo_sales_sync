@@ -87,3 +87,25 @@ CREATE TABLE IF NOT EXISTS `PREFIX_odoo_sales_cart_rule_state` (
   UNIQUE KEY `id_cart` (`id_cart`),
   KEY `date_upd` (`date_upd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Cart voucher snapshots for detecting apply/remove';
+
+-- Table 5: Reverse Operations Tracking (v2.0.0 - NEW for reverse sync)
+CREATE TABLE IF NOT EXISTS `PREFIX_odoo_sales_reverse_operations` (
+  `id_reverse_operation` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `operation_id` VARCHAR(64) NOT NULL COMMENT 'Unique operation identifier (UUID)',
+  `entity_type` ENUM('customer','order','address','coupon') NOT NULL COMMENT 'Entity type being synchronized',
+  `entity_id` INT UNSIGNED NULL COMMENT 'PrestaShop entity ID (NULL if creation failed)',
+  `action_type` ENUM('created','updated','deleted') NOT NULL COMMENT 'Action performed',
+  `source_payload` MEDIUMTEXT NULL COMMENT 'Original webhook payload from Odoo (JSON)',
+  `result_data` TEXT NULL COMMENT 'Processing result details (JSON)',
+  `status` ENUM('processing','success','failed') DEFAULT 'processing' COMMENT 'Operation status',
+  `error_message` TEXT NULL COMMENT 'Error message if failed',
+  `processing_time_ms` INT NULL COMMENT 'Processing duration in milliseconds',
+  `date_add` DATETIME NOT NULL COMMENT 'Operation created timestamp',
+  `date_upd` DATETIME NOT NULL COMMENT 'Operation last updated timestamp',
+  PRIMARY KEY (`id_reverse_operation`),
+  UNIQUE KEY `operation_id` (`operation_id`),
+  KEY `entity_lookup` (`entity_type`, `entity_id`),
+  KEY `status` (`status`),
+  KEY `date_add` (`date_add`),
+  KEY `entity_type_status` (`entity_type`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Tracks reverse synchronization operations from Odoo';

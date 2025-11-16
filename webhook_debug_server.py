@@ -50,13 +50,16 @@ class WebhookStats:
         self.failed = 0
         self.by_entity_type = {}
         self.by_action_type = {}
+        self.reverse_sync_count = 0  # NEW: Track reverse sync events
         self.start_time = datetime.now()
 
-    def record_success(self, entity_type, action_type):
+    def record_success(self, entity_type, action_type, is_reverse_sync=False):
         self.total_requests += 1
         self.successful += 1
         self.by_entity_type[entity_type] = self.by_entity_type.get(entity_type, 0) + 1
         self.by_action_type[action_type] = self.by_action_type.get(action_type, 0) + 1
+        if is_reverse_sync:
+            self.reverse_sync_count += 1
 
     def record_failure(self, reason):
         self.total_requests += 1
@@ -69,6 +72,7 @@ class WebhookStats:
             'total_requests': self.total_requests,
             'successful': self.successful,
             'failed': self.failed,
+            'reverse_sync': self.reverse_sync_count,  # NEW
             'by_entity_type': self.by_entity_type,
             'by_action_type': self.by_action_type
         }
@@ -186,6 +190,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
                             <td>Failed</td>
                             <td style="color: red;">{stats['failed']}</td>
                         </tr>
+                        <tr>
+                            <td>🔄 Reverse Sync</td>
+                            <td style="color: #00bcd4;">{stats.get('reverse_sync', 0)}</td>
+                        </tr>
                     </table>
 
                     <h4>By Entity Type:</h4>
@@ -295,9 +303,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
             for idx, event in enumerate(events, 1):
                 entity_type = event.get('entity_type', 'unknown')
                 action_type = event.get('action_type', 'unknown')
+                is_reverse_sync = event.get('reverse_sync', False)
 
                 # Update stats
-                self.stats.record_success(entity_type, action_type)
+                self.stats.record_success(entity_type, action_type, is_reverse_sync)
 
                 # Display event
                 print(f"\n{Colors.BOLD}📋 Event {idx}/{len(events)}:{Colors.ENDC}")
@@ -326,6 +335,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             # Handle single event payload (old format)
             entity_type = payload.get('entity_type', 'unknown')
             action_type = payload.get('action_type', 'unknown')
+            is_reverse_sync = payload.get('reverse_sync', False)
 
             # Display webhook
             self.display_webhook(payload)
@@ -334,7 +344,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.log_to_file('INFO', 'Webhook received', payload)
 
             # Update stats
-            self.stats.record_success(entity_type, action_type)
+            self.stats.record_success(entity_type, action_type, is_reverse_sync)
 
             # Send success response
             self.send_response(200)
@@ -358,12 +368,33 @@ class WebhookHandler(BaseHTTPRequestHandler):
         action_type = event.get('action_type', 'unknown')
         hook_name = event.get('hook_name', 'N/A')
 
+        # NEW: Check if this is a reverse sync operation
+        is_reverse_sync = event.get('reverse_sync', False)
+        source = event.get('source', 'prestashop')
+        destination = event.get('destination', 'odoo')
+
+        # Display different header for reverse sync
+        if is_reverse_sync:
+            print(f"   {Colors.OKCYAN}🔄 REVERSE SYNC{Colors.ENDC}")
+            print(f"   {Colors.BOLD}Flow:{Colors.ENDC} {source} → {destination}")
+
         print(f"   Event ID:     {Colors.WARNING}{event_id}{Colors.ENDC}")
         print(f"   Entity Type:  {Colors.OKBLUE}{entity_type}{Colors.ENDC}")
         print(f"   Entity ID:    {entity_id}")
-        print(f"   Entity Name:  {entity_name}")
+        if not is_reverse_sync:
+            print(f"   Entity Name:  {entity_name}")
         print(f"   Action:       {Colors.OKGREEN}{action_type}{Colors.ENDC}")
         print(f"   Hook:         {hook_name}")
+
+        # Show result if available (for reverse sync)
+        if is_reverse_sync and 'result' in event:
+            result = event['result']
+            success = result.get('success', False)
+            status_color = Colors.OKGREEN if success else Colors.FAIL
+            status_symbol = '✓' if success else '✗'
+            print(f"   Result:       {status_color}{status_symbol} {result.get('message', 'N/A')}{Colors.ENDC}")
+            if not success and 'error' in result:
+                print(f"   Error:        {Colors.FAIL}{result['error']}{Colors.ENDC}")
 
         # Show key data fields for orders
         if 'after_data' in event and event['after_data']:
@@ -400,9 +431,21 @@ class WebhookHandler(BaseHTTPRequestHandler):
         """Display webhook payload in formatted output"""
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        print(f"\n{Colors.BOLD}{Colors.OKGREEN}{'='*80}{Colors.ENDC}")
-        print(f"{Colors.BOLD}{Colors.HEADER}🔔 WEBHOOK #{self.stats.total_requests + 1}{Colors.ENDC}")
-        print(f"{Colors.BOLD}{Colors.OKGREEN}{'='*80}{Colors.ENDC}")
+        # Check if this is a reverse sync operation
+        is_reverse_sync = payload.get('reverse_sync', False)
+        source = payload.get('source', 'prestashop')
+        destination = payload.get('destination', 'odoo')
+
+        # Display header with appropriate styling
+        if is_reverse_sync:
+            print(f"\n{Colors.BOLD}{Colors.OKCYAN}{'='*80}{Colors.ENDC}")
+            print(f"{Colors.BOLD}{Colors.HEADER}🔄 REVERSE SYNC WEBHOOK #{self.stats.total_requests + 1}{Colors.ENDC}")
+            print(f"{Colors.BOLD}{Colors.OKCYAN}{'='*80}{Colors.ENDC}")
+        else:
+            print(f"\n{Colors.BOLD}{Colors.OKGREEN}{'='*80}{Colors.ENDC}")
+            print(f"{Colors.BOLD}{Colors.HEADER}🔔 WEBHOOK #{self.stats.total_requests + 1}{Colors.ENDC}")
+            print(f"{Colors.BOLD}{Colors.OKGREEN}{'='*80}{Colors.ENDC}")
+
         print(f"{Colors.OKCYAN}Timestamp:{Colors.ENDC} {timestamp}")
 
         # Extract key fields
@@ -416,11 +459,27 @@ class WebhookHandler(BaseHTTPRequestHandler):
         # Display summary
         print(f"\n{Colors.BOLD}📋 Event Summary:{Colors.ENDC}")
         print(f"   Event ID:     {Colors.WARNING}{event_id}{Colors.ENDC}")
+
+        # Show flow direction for reverse sync
+        if is_reverse_sync:
+            print(f"   {Colors.OKCYAN}🔄 REVERSE SYNC{Colors.ENDC}")
+            print(f"   {Colors.BOLD}Flow:{Colors.ENDC} {source} → {destination}")
+
         print(f"   Entity Type:  {Colors.OKBLUE}{entity_type}{Colors.ENDC}")
         print(f"   Entity ID:    {entity_id}")
         print(f"   Entity Name:  {entity_name}")
         print(f"   Action:       {Colors.OKGREEN}{action_type}{Colors.ENDC}")
         print(f"   Hook:         {hook_name}")
+
+        # Show result for reverse sync
+        if is_reverse_sync and 'result' in payload:
+            result = payload['result']
+            success = result.get('success', False)
+            status_color = Colors.OKGREEN if success else Colors.FAIL
+            status_symbol = '✓' if success else '✗'
+            print(f"   Result:       {status_color}{status_symbol} {result.get('message', 'N/A')}{Colors.ENDC}")
+            if not success and 'error' in result:
+                print(f"   Error:        {Colors.FAIL}{result['error']}{Colors.ENDC}")
 
         # Display data payload
         if 'data' in payload and payload['data']:
