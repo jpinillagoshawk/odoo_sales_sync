@@ -1,5 +1,37 @@
 # Changelog - Odoo Sales Sync Module
 
+## Version 2.0.1 - 2025-01-16
+
+### 🐛 Bug Fixes
+
+- **Fixed**: Missing `changeLogsLimit()` JavaScript function for logs per page selector
+- **Fixed**: Missing `clearEventFilters()` function for Events tab filter reset
+- **Fixed**: Logs per page dropdown now works correctly
+- **Fixed**: Page navigation properly updates with filter changes
+
+### ✨ Improvements
+
+- **Enhanced**: Event detail modal now shows "Odoo Inbound Event" indicator for reverse webhooks
+- **Enhanced**: Added sync direction labels with icons (PrestaShop → Odoo vs Odoo → PrestaShop)
+- **Enhanced**: Reverse sync events now create tracking entries in `ps_odoo_sales_events` table
+- **Enhanced**: Events tab displays both forward and reverse sync operations with visual distinction
+
+### 🔧 Technical Changes
+
+- Added `is_reverse_sync` flag detection (hook_name === 'reverse_webhook')
+- Enhanced `OdooSalesReverseWebhookRouter` with `createEventRecord()` method
+- Added `getEntityName()` helper for better entity display names
+- Modified `AdminOdooSalesSyncEventsController::enrichEventsWithEntityData()` to mark reverse sync events
+- Updated `renderEventDetailModal()` to show alert and direction for inbound Odoo events
+
+### 📝 Files Changed
+
+- `views/js/admin.js` - Added missing JavaScript functions
+- `controllers/admin/AdminOdooSalesSyncEventsController.php` - Enhanced event display
+- `classes/OdooSalesReverseWebhookRouter.php` - Added event tracking
+
+---
+
 ## Version 2.0.0 - 2025-01-16
 
 ### 🚀 MAJOR FEATURE: Bi-Directional Synchronization (Reverse Sync)

@@ -2,7 +2,7 @@
 <module>
     <name>odoo_sales_sync</name>
     <displayName><![CDATA[Odoo Sales Sync]]></displayName>
-    <version><![CDATA[2.0.0]]></version>
+    <version><![CDATA[2.0.1]]></version>
     <description><![CDATA[Bi-directional synchronization with Odoo. Sends customer, order, invoice, and coupon events to Odoo. NEW v2.0: Receives updates FROM Odoo (reverse sync).]]></description>
     <author><![CDATA[Azor Data SL]]></author>
     <tab><![CDATA[administration]]></tab>

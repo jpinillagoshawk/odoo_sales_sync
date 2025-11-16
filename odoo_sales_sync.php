@@ -57,7 +57,7 @@ class odoo_sales_sync extends Module
     {
         $this->name = 'odoo_sales_sync';
         $this->tab = 'administration';
-        $this->version = '2.0.0';
+        $this->version = '2.0.1';
         $this->author = 'Azor Data SL';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array('min' => '8.0.0', 'max' => '8.99.99');
