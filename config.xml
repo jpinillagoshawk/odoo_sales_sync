@@ -2,8 +2,8 @@
 <module>
     <name>odoo_sales_sync</name>
     <displayName><![CDATA[Odoo Sales Sync]]></displayName>
-    <version><![CDATA[1.1.0]]></version>
-    <description><![CDATA[Synchronizes customer, order, invoice, and coupon events with Odoo via webhook. Enhanced with complete order data for migration.]]></description>
+    <version><![CDATA[2.0.0]]></version>
+    <description><![CDATA[Bi-directional synchronization with Odoo. Sends customer, order, invoice, and coupon events to Odoo. NEW v2.0: Receives updates FROM Odoo (reverse sync).]]></description>
     <author><![CDATA[Azor Data SL]]></author>
     <tab><![CDATA[administration]]></tab>
     <confirmUninstall><![CDATA[Are you sure you want to uninstall? All event data will be deleted.]]></confirmUninstall>
