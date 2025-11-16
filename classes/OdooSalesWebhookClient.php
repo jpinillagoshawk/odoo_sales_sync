@@ -243,21 +243,41 @@ class OdooSalesWebhookClient
      */
     private function sendBatchRequest($batchData)
     {
-        $jsonPayload = json_encode($batchData);
+        // Encode with JSON_UNESCAPED_UNICODE and JSON_UNESCAPED_SLASHES for better compatibility
+        $jsonPayload = json_encode($batchData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        // Check for JSON encoding errors
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $jsonError = json_last_error_msg();
+            $this->logger->error('[WEBHOOK_CLIENT] JSON encoding failed', [
+                'error' => $jsonError,
+                'batch_id' => $batchData['batch_id']
+            ]);
+            throw new Exception('JSON encoding error: ' . $jsonError);
+        }
+
+        // Validate JSON is well-formed
+        if (empty($jsonPayload) || $jsonPayload === 'null') {
+            $this->logger->error('[WEBHOOK_CLIENT] Empty or invalid JSON payload', [
+                'batch_id' => $batchData['batch_id']
+            ]);
+            throw new Exception('Empty or invalid JSON payload');
+        }
 
         $headers = [
-            'Content-Type: application/json',
+            'Content-Type: application/json; charset=utf-8',
             'Content-Length: ' . strlen($jsonPayload),
             'X-Webhook-Secret: ' . $this->webhookSecret,
             'X-Batch-ID: ' . $batchData['batch_id'],
-            'User-Agent: PrestaShop-Odoo-Sales-Sync/1.0'
+            'User-Agent: PrestaShop-Odoo-Sales-Sync/2.0'
         ];
 
         $this->logger->debug('[WEBHOOK_CLIENT] Sending HTTP request', [
             'url' => $this->webhookUrl,
             'method' => 'POST',
             'payload_size' => strlen($jsonPayload),
-            'event_count' => count($batchData['events'])
+            'event_count' => count($batchData['events']),
+            'payload_preview' => substr($jsonPayload, 0, 200) . '...'
         ]);
 
         $ch = curl_init();
@@ -324,20 +344,45 @@ class OdooSalesWebhookClient
      */
     private function prepareEventData($event)
     {
+        // Safely decode JSON fields with validation
+        $beforeData = null;
+        if (!empty($event->before_data)) {
+            $decoded = json_decode($event->before_data, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $beforeData = $decoded;
+            }
+        }
+
+        $afterData = null;
+        if (!empty($event->after_data)) {
+            $decoded = json_decode($event->after_data, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $afterData = $decoded;
+            }
+        }
+
+        $contextData = null;
+        if (!empty($event->context_data)) {
+            $decoded = json_decode($event->context_data, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $contextData = $decoded;
+            }
+        }
+
         return [
-            'event_id' => $event->id,
-            'entity_type' => $event->entity_type,
-            'entity_id' => (string)$event->entity_id,
-            'entity_name' => $event->entity_name,
-            'action_type' => $event->action_type,
-            'transaction_hash' => $event->transaction_hash,
-            'correlation_id' => $event->correlation_id,
-            'hook_name' => $event->hook_name,
-            'hook_timestamp' => $event->hook_timestamp,
-            'before_data' => $event->before_data ? json_decode($event->before_data, true) : null,
-            'after_data' => $event->after_data ? json_decode($event->after_data, true) : null,
-            'change_summary' => $event->change_summary,
-            'context_data' => $event->context_data ? json_decode($event->context_data, true) : null
+            'event_id' => (int)$event->id,
+            'entity_type' => (string)$event->entity_type,
+            'entity_id' => (int)$event->entity_id,
+            'entity_name' => (string)($event->entity_name ?? ''),
+            'action_type' => (string)$event->action_type,
+            'transaction_hash' => (string)$event->transaction_hash,
+            'correlation_id' => (string)($event->correlation_id ?? ''),
+            'hook_name' => (string)$event->hook_name,
+            'hook_timestamp' => (string)$event->hook_timestamp,
+            'before_data' => $beforeData,
+            'after_data' => $afterData,
+            'change_summary' => (string)($event->change_summary ?? ''),
+            'context_data' => $contextData
         ];
     }
 
@@ -396,12 +441,21 @@ class OdooSalesWebhookClient
                 'timestamp' => date('Y-m-d H:i:s')
             ];
 
-            $jsonPayload = json_encode($testPayload);
+            $jsonPayload = json_encode($testPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return [
+                    'success' => false,
+                    'message' => 'JSON encoding error: ' . json_last_error_msg(),
+                    'response_code' => 0
+                ];
+            }
 
             $headers = [
-                'Content-Type: application/json',
+                'Content-Type: application/json; charset=utf-8',
+                'Content-Length: ' . strlen($jsonPayload),
                 'X-Webhook-Secret: ' . $this->webhookSecret,
-                'User-Agent: PrestaShop-Odoo-Sales-Sync/1.0'
+                'User-Agent: PrestaShop-Odoo-Sales-Sync/2.0'
             ];
 
             $ch = curl_init();
